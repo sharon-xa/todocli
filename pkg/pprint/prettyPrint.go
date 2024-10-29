@@ -13,7 +13,6 @@ func Perror(msg string) {
 	fmt.Println(msg)
 }
 
-// make this function take color and
 func Pprint(msg string, c color.Attribute) {
 	color.Set(c, color.Bold)
 	fmt.Print(msg)
