@@ -2,6 +2,7 @@ package todo
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -54,31 +55,26 @@ func (t *Todo) PrintTasks() {
 }
 
 func (t *Todo) RemoveTask(taskId int) {
-	f := file.LoadFileToRead(t.FilePath)
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	newLines := make([]string, 0)
-
-	i := 1
-	for scanner.Scan() {
-		line := scanner.Text()
-		if i != taskId {
-			newLines = append(newLines, line)
-		}
-		i++
+	newLines, err := t.getFileContentMap()
+	if err != nil {
+		pprint.Perror(err.Error())
+		return
 	}
 
-	if err := scanner.Err(); err != nil {
-		pprint.Perror("Can't read file")
+	if len(*newLines) == 0 {
+		pprint.Pdone("No Tasks to remove.")
+		return
 	}
 
-	newFileContent := strings.Join(newLines, "\n")
-	err := file.ReplaceFileContent(t.FilePath, newFileContent+"\n")
-	// I added the "\n" char because the newFileContent is joined by \n
-	// and when a save the new file content to the file
-	// I get a all the lines normally but the list line doesn't have a new line char
-	// so when we append the new task it will be appended to the last line and not to a new line
+	delete(*newLines, taskId)
+
+	var newFileContent strings.Builder
+	for _, line := range *newLines {
+		newFileContent.WriteString(line)
+		newFileContent.WriteString("\n")
+	}
+
+	err = file.ReplaceFileContent(t.FilePath, newFileContent.String())
 	if err != nil {
 		pprint.Perror(fmt.Sprintf("couldn't write to the file, %s", err.Error()))
 		return
@@ -98,36 +94,55 @@ func (t *Todo) AddTask(task string) {
 }
 
 func (t *Todo) ToggleTask(taskId int) {
-	f := file.LoadFileToRead(t.FilePath)
-	scanner := bufio.NewScanner(f)
-
-	newLines := make([]string, 0)
-
-	i := 1
-	for scanner.Scan() {
-		line := scanner.Text()
-		if i == taskId {
-			if strings.Contains(line, "[X]") {
-				line = strings.Replace(line, "[X", "[", 1)
-			} else {
-				line = strings.Replace(line, "[", "[X", 1)
-			}
-		}
-		newLines = append(newLines, line)
-		i++
-	}
-
-	if err := scanner.Err(); err != nil {
-		pprint.Perror("Can't read file")
+	newLines, err := t.getFileContentMap()
+	if err != nil {
+		pprint.Perror(err.Error())
 		return
 	}
 
-	newFileContent := strings.Join(newLines, "\n")
-	err := file.ReplaceFileContent(t.FilePath, newFileContent)
+	if len(*newLines) == 0 {
+		pprint.Perror("No Tasks to toggle.")
+		return
+	}
+
+	if strings.Contains((*newLines)[taskId], "[X]") {
+		(*newLines)[taskId] = strings.Replace((*newLines)[taskId], "[X", "[", 1)
+	} else if strings.Contains((*newLines)[taskId], "[]") {
+		(*newLines)[taskId] = strings.Replace((*newLines)[taskId], "[]", "[X]", 1)
+	}
+
+	var newFileContent strings.Builder
+	for _, line := range *newLines {
+		newFileContent.WriteString(line)
+		newFileContent.WriteString("\n")
+	}
+
+	err = file.ReplaceFileContent(t.FilePath, newFileContent.String())
 	if err != nil {
 		pprint.Perror(fmt.Sprintf("couldn't write to the file, %s", err.Error()))
 		return
 	}
 
 	t.PrintTasks()
+}
+
+func (t *Todo) getFileContentMap() (*map[int]string, error) {
+	f := file.LoadFileToRead(t.FilePath)
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	newLines := make(map[int]string, 0)
+
+	i := 1
+	for scanner.Scan() {
+		line := scanner.Text()
+		newLines[i] = line
+		i++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, errors.New("Can't read file")
+	}
+
+	return &newLines, nil
 }
