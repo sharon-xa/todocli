@@ -15,8 +15,6 @@ type Todo struct {
 }
 
 func Init() *Todo {
-	t := new(Todo)
-
 	configDir := filepath.Join(os.Getenv("HOME"), ".config", "todo")
 	if !file.DirectoryExists(configDir) {
 		err := os.MkdirAll(configDir, 0755)
@@ -26,9 +24,9 @@ func Init() *Todo {
 		}
 	}
 
-	t.FilePath = filepath.Join(configDir, "todo.txt")
-	if !file.FileExists(t.FilePath) {
-		file, err := os.OpenFile(t.FilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
+	filePath := filepath.Join(configDir, "todo.txt")
+	if !file.FileExists(filePath) {
+		file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
 		defer file.Close()
 		if err != nil {
 			pprint.Perror(fmt.Sprintf("Can't create todo.txt file, %s", err))
@@ -36,7 +34,7 @@ func Init() *Todo {
 		}
 	}
 
-	return t
+	return &Todo{FilePath: filePath}
 }
 
 func (t *Todo) OpenFileWithDefaultEditor() {
